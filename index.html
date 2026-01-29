@@ -3,41 +3,186 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Galería Pro</title>
+    <title>Galería Pro Blue</title>
     <style>
-        body { background: #000; color: #fff; font-family: sans-serif; margin: 0; padding: 20px; text-align: center; }
-        #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 20px; }
-        img { width: 100%; height: 150px; object-fit: cover; border-radius: 8px; }
-        .btn { background: #007bff; color: white; padding: 15px 25px; border: none; border-radius: 50px; font-size: 18px; cursor: pointer; }
+        :root { 
+            --bg: #000000; 
+            --card-bg: #111111;
+            --accent-blue: #3b82f6; 
+            --text-main: #ffffff;
+            --text-dim: #94a3b8;
+        }
+
+        body { 
+            margin: 0; background: var(--bg); color: var(--text-main); 
+            font-family: 'Segoe UI', Roboto, sans-serif; 
+        }
+
+        /* --- CABECERA --- */
+        .header {
+            padding: 20px; font-size: 24px; font-weight: bold;
+            border-bottom: 1px solid #222; display: flex; justify-content: space-between;
+        }
+
+        /* --- GRID DE ÁLBUMES (Igual a tu imagen) --- */
+        #grid-albumes {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+            padding: 12px;
+        }
+
+        .album-card {
+            background: var(--card-bg); border-radius: 8px; overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+
+        .portada-container {
+            width: 100%; aspect-ratio: 1 / 1; background: #222;
+            overflow: hidden; position: relative;
+        }
+
+        .portada { width: 100%; height: 100%; object-fit: cover; }
+
+        .info { padding: 8px 4px; }
+        .nombre { font-size: 16px; font-weight: 500; display: block; }
+        .conteo { font-size: 13px; color: var(--text-dim); }
+
+        /* --- MENÚ INFERIOR --- */
+        .nav-inferior {
+            position: fixed; bottom: 0; width: 100%; background: #000;
+            display: flex; justify-content: space-around; padding: 15px 0;
+            border-top: 1px solid #222; font-size: 14px; color: var(--text-dim);
+        }
+        .nav-item.active { color: var(--accent-blue); border-bottom: 2px solid var(--accent-blue); }
+
+        /* --- VISOR FULLSCREEN --- */
+        #viewer { 
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
+            background: #000; z-index: 5000; display: none;
+        }
+        .img-wrap {
+            width: 100vw; height: 100vh; display: flex; align-items: center; 
+            justify-content: center; position: absolute; opacity: 0; transition: opacity 0.6s;
+        }
+        .foto { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .anim { animation: zoomP 4s linear forwards; }
+        @keyframes zoomP { from { transform: scale(1); } to { transform: scale(1.6); } }
+
+        #btn-cargar {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: var(--accent-blue); color: white; border: none;
+            padding: 15px 30px; border-radius: 50px; font-weight: bold; z-index: 100;
+        }
     </style>
 </head>
 <body>
-    <h1>Mi Galería USB</h1>
-    <button class="btn" onclick="document.getElementById('folderInput').click()">Abrir Carpeta de Fotos</button>
-    <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none">
-    
-    <div id="grid"></div>
 
-    <script>
-        const folderInput = document.getElementById('folderInput');
-        const grid = document.getElementById('grid');
+<div id="app">
+    <div class="header">
+        <span>Galería</span>
+        <span style="color: var(--accent-blue); font-size: 16px;" onclick="document.getElementById('input-folder').click()">Cambiar Carpeta</span>
+    </div>
 
-        folderInput.addEventListener('change', (e) => {
-            grid.innerHTML = ''; // Limpiar galería
-            const files = Array.from(e.target.files).filter(file => file.type.startsWith('image/'));
-            
-            if(files.length === 0) alert('No se encontraron imágenes en esa carpeta.');
+    <button id="btn-cargar" onclick="document.getElementById('input-folder').click()">📂 ABRIR CARPETA USB</button>
+    <input type="file" id="input-folder" webkitdirectory directory multiple style="display:none;">
 
-            files.forEach(file => {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const img = document.createElement('img');
-                    img.src = event.target.result;
-                    grid.appendChild(img);
-                };
-                reader.readAsDataURL(file);
-            });
+    <div id="grid-albumes">
+        </div>
+
+    <div class="nav-inferior">
+        <div class="nav-item">Imágenes</div>
+        <div class="nav-item active">Álbumes</div>
+        <div class="nav-item">Historia</div>
+        <div class="nav-item">Creador</div>
+    </div>
+</div>
+
+<div id="viewer" onclick="cerrarVisor()"></div>
+
+<script>
+    let albumes = {};
+    let fotosLoop = null;
+    let actualAlbum = [];
+    let idx = 0;
+
+    document.getElementById('input-folder').onchange = function(e) {
+        const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
+        if (files.length === 0) return;
+
+        document.getElementById('btn-cargar').style.display = 'none';
+        albumes = {};
+
+        files.forEach(file => {
+            const parts = file.webkitRelativePath.split('/');
+            const folderName = parts.length > 2 ? parts[parts.length - 2] : "Otros";
+            if (!albumes[folderName]) albumes[folderName] = [];
+            albumes[folderName].push(file);
         });
-    </script>
+
+        renderAlbumes();
+    };
+
+    function renderAlbumes() {
+        const grid = document.getElementById('grid-albumes');
+        grid.innerHTML = "";
+        
+        for (const nombre in albumes) {
+            const fotos = albumes[nombre];
+            const url = URL.createObjectURL(fotos[0]);
+
+            const card = document.createElement('div');
+            card.className = 'album-card';
+            card.onclick = () => iniciarSlideshow(nombre);
+
+            card.innerHTML = `
+                <div class="portada-container">
+                    <img src="${url}" class="portada">
+                </div>
+                <div class="info">
+                    <span class="nombre">${nombre}</span>
+                    <span class="conteo">${fotos.length}</span>
+                </div>
+            `;
+            grid.appendChild(card);
+        }
+    }
+
+    function iniciarSlideshow(nombre) {
+        actualAlbum = albumes[nombre];
+        idx = 0;
+        document.getElementById('viewer').style.display = 'block';
+        if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+        
+        cambiarFoto();
+        fotosLoop = setInterval(cambiarFoto, 3000);
+    }
+
+    function cambiarFoto() {
+        const visor = document.getElementById('viewer');
+        const viejas = document.querySelectorAll('.img-wrap');
+        const wrap = document.createElement('div');
+        wrap.className = 'img-wrap';
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(actualAlbum[idx]);
+        img.className = 'foto anim';
+        wrap.appendChild(img);
+        visor.appendChild(wrap);
+
+        setTimeout(() => {
+            wrap.style.opacity = "1";
+            viejas.forEach(v => {
+                v.style.opacity = "0";
+                setTimeout(() => v.remove(), 600);
+            });
+        }, 50);
+        idx = (idx + 1) % actualAlbum.length;
+    }
+
+    function cerrarVisor() {
+        clearInterval(fotosLoop);
+        document.getElementById('viewer').style.display = 'none';
+        document.getElementById('viewer').innerHTML = "";
+        if (document.fullscreenElement) document.exitFullscreen();
+    }
+</script>
 </body>
 </html>
