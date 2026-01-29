@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-    <title>PhotoFlow Blue Armor</title>
+    <title>PhotoFlow Blue Armor - FullScreen</title>
     <style>
         :root { 
             --deep-blue: #020617;
@@ -25,10 +25,11 @@
         .card {
             background: rgba(30, 58, 138, 0.3); border: 1px solid rgba(59, 130, 246, 0.5);
             padding: 25px; border-radius: 24px; backdrop-filter: blur(12px);
-            width: 300px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            width: 310px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            text-align: center;
         }
 
-        h1 { color: #60a5fa; margin-top: 0; text-shadow: 0 0 10px rgba(96, 165, 250, 0.5); }
+        h1 { color: #60a5fa; margin-bottom: 15px; text-shadow: 0 0 10px rgba(96, 165, 250, 0.5); }
 
         .btn-main { 
             background: linear-gradient(to right, var(--electric-blue), var(--purple));
@@ -46,22 +47,28 @@
 
         .btn-s.active { 
             background: var(--royal-blue); color: white; border-color: var(--electric-blue);
-            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
         }
 
         #viewer { 
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
-            background: #000; z-index: 2000; display: none;
+            background: #000; z-index: 2000; display: none; cursor: pointer;
         }
 
         .img-wrap {
             width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center;
-            position: absolute; transition: opacity 0.6s ease; opacity: 0;
+            position: absolute; transition: opacity 0.8s ease-in-out; opacity: 0;
         }
 
         .foto { max-width: 100%; max-height: 100%; object-fit: contain; }
-        .anim { animation: zProfundo 4s ease-out forwards; }
-        @keyframes zProfundo { from { transform: scale(1); } to { transform: scale(1.7); } }
+
+        /* Animaciones de Zoom Aleatorias */
+        .zoom-in { animation: zoomInAnim 5s ease-out forwards; }
+        .zoom-out { animation: zoomOutAnim 5s ease-out forwards; }
+        .zoom-drift { animation: zoomDriftAnim 5s ease-out forwards; }
+
+        @keyframes zoomInAnim { from { transform: scale(1); } to { transform: scale(1.3); } }
+        @keyframes zoomOutAnim { from { transform: scale(1.3); } to { transform: scale(1); } }
+        @keyframes zoomDriftAnim { from { transform: scale(1.1) translateX(-20px); } to { transform: scale(1.2) translateX(20px); } }
 
         #loading { display: none; color: #60a5fa; margin-top: 15px; font-weight: bold; }
     </style>
@@ -72,29 +79,29 @@
     <div class="card">
         <h1>PhotoFlow</h1>
         <select id="sort" style="width:100%; padding:12px; border-radius:10px; background:#0f172a; color:white; border:1px solid #334155;">
-            <option value="new">✨ Recientes</option>
-            <option value="old">⏳ Antiguos</option>
+            <option value="new">✨ Recientes primero</option>
+            <option value="old">⏳ Antiguos primero</option>
         </select>
 
         <div class="speed-bar">
-            <button class="btn-s" onclick="setV(1000,this)">1s</button>
-            <button class="btn-s active" onclick="setV(2000,this)">2s</button>
-            <button class="btn-s" onclick="setV(3000,this)">3s</button>
+            <button class="btn-s" onclick="setV(2000,this)">2s</button>
+            <button class="btn-s active" onclick="setV(4000,this)">4s</button>
+            <button class="btn-s" onclick="setV(6000,this)">6s</button>
         </div>
 
-        <button class="btn-main" onclick="document.getElementById('file-input').click()">📂 CARGAR USB</button>
-        <div id="loading">Preparando fotos...</div>
+        <button class="btn-main" onclick="abrirSeleccion()">📂 INICIAR</button>
+        <div id="loading">Cargando USB...</div>
         <input type="file" id="file-input" webkitdirectory directory multiple style="display:none;">
     </div>
 </div>
 
-<div id="viewer" onclick="exit()"></div>
+<div id="viewer" onclick="detenerYRegresar()"></div>
 
 <script>
     let photos = [];
     let loop = null;
     let current = 0;
-    let speed = 2000;
+    let speed = 4000;
 
     function setV(ms, b) {
         speed = ms;
@@ -102,42 +109,54 @@
         b.classList.add('active');
     }
 
+    function abrirSeleccion() {
+        document.getElementById('file-input').click();
+    }
+
     document.getElementById('file-input').onchange = function(e) {
         const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
         if (files.length === 0) return;
 
+        // Activar Pantalla Completa
+        let elem = document.documentElement;
+        if (elem.requestFullscreen) { elem.requestFullscreen(); } 
+        else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); }
+
         document.getElementById('loading').style.display = 'block';
 
-        // Ordenamiento
         const mode = document.getElementById('sort').value;
         files.sort((a, b) => mode === 'new' ? b.lastModified - a.lastModified : a.lastModified - b.lastModified);
         
         photos = files;
 
-        // Iniciar
         setTimeout(() => {
             document.getElementById('inicio').style.display = 'none';
             document.getElementById('viewer').style.display = 'block';
-            
-            // Pantalla completa opcional (si falla, no detiene el proceso)
-            try { document.documentElement.requestFullscreen(); } catch(err) {}
-            
-            showNext();
-            loop = setInterval(showNext, speed);
-        }, 100);
+            iniciarPresentacion();
+        }, 500);
     };
+
+    function iniciarPresentacion() {
+        showNext();
+        loop = setInterval(showNext, speed);
+    }
 
     function showNext() {
         if (photos.length === 0) return;
+        
         const visor = document.getElementById('viewer');
         const oldOnes = document.querySelectorAll('.img-wrap');
         
         const wrap = document.createElement('div');
         wrap.className = 'img-wrap';
+        
         const img = document.createElement('img');
         const url = URL.createObjectURL(photos[current]);
         img.src = url;
-        img.className = 'foto anim';
+
+        const anims = ['zoom-in', 'zoom-out', 'zoom-drift'];
+        const randomAnim = anims[Math.floor(Math.random() * anims.length)];
+        img.className = 'foto ' + randomAnim;
         
         wrap.appendChild(img);
         visor.appendChild(wrap);
@@ -150,15 +169,25 @@
                     const i = v.querySelector('img');
                     if (i) URL.revokeObjectURL(i.src);
                     v.remove();
-                }, 600);
+                }, 800);
             });
         }, 50);
 
         current = (current + 1) % photos.length;
     }
 
-    function exit() {
-        if (confirm("¿Volver al menú?")) location.reload();
+    function detenerYRegresar() {
+        // Detener el intervalo
+        clearInterval(loop);
+        
+        // Salir de pantalla completa si está activa
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
+            if (document.exitFullscreen) { document.exitFullscreen(); }
+            else if (document.webkitExitFullscreen) { document.webkitExitFullscreen(); }
+        }
+
+        // Recargar para volver al estado inicial de la carpeta
+        location.reload();
     }
 </script>
 </body>
